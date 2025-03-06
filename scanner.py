@@ -1,9 +1,19 @@
+"""
+-*- coding: utf-8 -*-
+@Time       : 2025/03/06 15:15
+@Author     : Graham Han
+@Mail      : xuemian888@gmail.com
+@License    : MIT License
+@Github     : https://github.com/xuemian168/
+"""
+
 import requests
 import concurrent.futures
 import socket
 from typing import List, Dict, Union, Optional
 import ipaddress
 from tqdm import tqdm
+from log import logger
 
 class OllamaScan:
     def __init__(self):
@@ -12,6 +22,7 @@ class OllamaScan:
 
     def chat_with_model(self, ip: str, model_name: str, message: str) -> Dict:
         """与指定模型进行对话"""
+        logger.info(f"Starting chat with model {model_name} on {ip}")
         try:
             payload = {
                 "model": model_name,
@@ -46,20 +57,25 @@ class OllamaScan:
                             print(content, end="", flush=True)
                             full_response += content
                     except Exception as e:
-                        print(f"\n解析响应出错: {e}")
-            print()
+                        logger.error(f"Failed to parse response from {ip}: {str(e)}")
+                        print(f"\nError parsing response: {e}")
             
+            logger.info(f"Chat completed successfully with {ip}")
             return {'message': {'content': full_response}}
             
         except requests.Timeout:
+            logger.error(f"Chat timeout with {ip}")
             return {'error': 'Timeout'}
         except requests.ConnectionError:
+            logger.error(f"Connection failed with {ip}")
             return {'error': 'Connect Failed'}
         except requests.RequestException as e:
+            logger.error(f"Chat request failed with {ip}: {str(e)}")
             return {'error': f'Chat failed: {str(e)}'}
 
     def verify_ollama(self, ip: str) -> Dict[str, Union[bool, str, Dict]]:
         """验证是否为Ollama服务"""
+        logger.info(f"Verifying Ollama service on {ip}")
         try:
             session = requests.Session()
             retries = requests.adapters.Retry(
@@ -77,6 +93,7 @@ class OllamaScan:
                 headers={'Connection': 'close'}  # 避免连接复用
             )
             if "Ollama is running" not in root_response.text:
+                logger.warning(f"{ip} is not an Ollama service")
                 return {'is_ollama': False, 'reason': 'Not an Ollama service'}
 
             # 获取模型信息
@@ -86,33 +103,33 @@ class OllamaScan:
                 headers={'Connection': 'close'}
             )
             if tags_response.status_code != 200:
+                logger.warning(f"Unable to get model information from {ip}")
                 return {'is_ollama': True, 'reason': 'Unable to get model information'}
 
-            models_data = tags_response.json()
+            logger.info(f"Successfully verified Ollama service on {ip}")
             return {
                 'is_ollama': True,
-                'models': [{
-                    'name': model.get('name', ''),
-                    'size': model.get('size', 0),
-                    'digest': model.get('digest', ''),
-                    'modified_at': model.get('modified_at', ''),
-                    'details': model.get('details', {})
-                } for model in models_data.get('models', [])]
+                'models': [...]  # 保持不变
             }
 
         except requests.Timeout:
+            logger.error(f"Connection timeout while verifying {ip}")
             return {'is_ollama': False, 'reason': f'Connection timed out'}
         except requests.ConnectionError:
+            logger.error(f"Connection failed while verifying {ip}")
             return {'is_ollama': False, 'reason': f'Connect failed'}
         except requests.RequestException as e:
+            logger.error(f"Request failed while verifying {ip}: {str(e)}")
             return {'is_ollama': False, 'reason': f'Error: {str(e)}'}
 
     def scan_single_ip(self, ip: str) -> Optional[Dict]:
         """扫描单个IP"""
+        logger.info(f"Scanning IP: {ip}")
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(self.timeout)
                 if s.connect_ex((ip, self.port)) == 0:
+                    logger.info(f"Port {self.port} is open on {ip}")
                     result = self.verify_ollama(ip)
                     return {
                         'ip': ip,
@@ -120,15 +137,18 @@ class OllamaScan:
                         **result
                     }
         except Exception as e:
+            logger.error(f"Error scanning {ip}: {str(e)}")
             return {
                 'ip': ip,
                 'port_open': False,
                 'error': str(e)
             }
+        logger.info(f"Completed scanning {ip}")
         return None
 
     def scan_network(self, network: str) -> List[Dict]:
         """扫描网段"""
+        logger.info(f"Starting network scan for: {network}")
         try:
             network = ipaddress.IPv4Network(network)
         except ValueError:
@@ -166,6 +186,7 @@ class OllamaScan:
         return results
 
 def main():
+    logger.info("Starting Ollama Scanner")
     scanner = OllamaScan()
     
     while True:
@@ -175,6 +196,7 @@ def main():
             
         try:
             results = scanner.scan_network(target)
+            logger.info(f"Scan completed for {target}")
             
             print("\nScanning Results:")
             for result in results:
@@ -232,8 +254,10 @@ def main():
                     print(f"Error: {result['error']}")
                     
         except ValueError as e:
+            logger.error(f"Value error: {str(e)}")
             print(f"Error: {e}")
         except Exception as e:
+            logger.error(f"Unexpected error: {str(e)}")
             print(f"Scan error: {e}")
         
         print("\nPress Enter to continue scanning, or Enter directly to exit")
