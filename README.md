@@ -2,6 +2,8 @@
 
 A command-line tool for scanning and interacting with Ollama services across networks.
 
+![image](image.png)
+
 ## Disclaimer
 
 This software is for testing and educational purposes only. By using this software, you agree:
