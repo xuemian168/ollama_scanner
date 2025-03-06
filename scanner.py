@@ -109,7 +109,7 @@ class OllamaScan:
             logger.info(f"Successfully verified Ollama service on {ip}")
             return {
                 'is_ollama': True,
-                'models': [...]  # 保持不变
+                
             }
 
         except requests.Timeout:
