@@ -45,7 +45,7 @@ class OllamaScan:
             
             import json
             
-            print("\n模型回复:", end="", flush=True)
+            print("\nReply:", end="", flush=True)
             full_response = ""
             for line in response.iter_lines():
                 if line:
@@ -106,10 +106,17 @@ class OllamaScan:
                 logger.warning(f"Unable to get model information from {ip}")
                 return {'is_ollama': True, 'reason': 'Unable to get model information'}
 
+            models_data = tags_response.json()  # Add this line to parse JSON response
             logger.info(f"Successfully verified Ollama service on {ip}")
             return {
                 'is_ollama': True,
-                
+                'models': [{
+                    'name': model.get('name', ''),
+                    'size': model.get('size', 0),
+                    'digest': model.get('digest', ''),
+                    'modified_at': model.get('modified_at', ''),
+                    'details': model.get('details', {})
+                } for model in models_data.get('models', [])]
             }
 
         except requests.Timeout:
